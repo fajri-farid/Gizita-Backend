@@ -42,7 +42,7 @@ public abstract class Auser {
     @Enumerated(EnumType.STRING)
     private Role role = Role.userGeneral;
 
-    protected Double balance;
+    protected Double balance = 0.0;
     protected String address;
     protected String phoneNumber;
 
