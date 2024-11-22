@@ -13,7 +13,7 @@ import java.time.LocalDate;
 @NoArgsConstructor
 @AllArgsConstructor
 
-public class Auser {
+public abstract class Auser {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private int Id;
