@@ -16,7 +16,7 @@ import java.time.LocalDate;
 @NoArgsConstructor
 @AllArgsConstructor
 
-@JsonTypeInfo(use = JsonTypeInfo.Id.NAME, include = JsonTypeInfo.As.PROPERTY, property = "type")
+@JsonTypeInfo(use = JsonTypeInfo.Id.NAME, include = JsonTypeInfo.As.PROPERTY, property = "type", defaultImpl = GeneralUser.class)
 @JsonSubTypes({
         @JsonSubTypes.Type(value = AhliGizi.class, name = "AdminUser"),
         @JsonSubTypes.Type(value = GeneralUser.class, name = "GeneralUser")
