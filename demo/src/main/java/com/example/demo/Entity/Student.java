@@ -23,4 +23,7 @@ public class Student {
 
     @Column(name = "NAME")
     private String name;
+
+    @Column(name = "GENDER")
+    private Boolean gender;
 }
