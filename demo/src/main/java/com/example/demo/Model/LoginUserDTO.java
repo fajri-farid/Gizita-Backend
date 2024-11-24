@@ -2,10 +2,9 @@ package com.example.demo.Model;
 
 import lombok.Data;
 
-
 @Data
-public class RegisterUserDTO {
+public class LoginUserDTO {
+
     private String email;
-    private String userName;
     private String password;
 }

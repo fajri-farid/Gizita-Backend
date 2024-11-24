@@ -12,4 +12,5 @@ import lombok.EqualsAndHashCode;
 @DiscriminatorValue("GeneralUser")
 
 public class GeneralUser extends Auser {
+
 }
