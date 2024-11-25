@@ -4,23 +4,20 @@ import com.example.demo.Entity.ChatMessage;
 import com.example.demo.Repository.ChatMessageRepo;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ArrayNode;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import okhttp3.*;
-import org.apache.coyote.Request;
-import org.apache.coyote.Response;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
-import org.springframework.web.bind.annotation.RequestBody;
 
 import java.io.IOException;
 
 @Service
 public class ChatService {
+
     @Value("${openai.api.key}")
     private String apiKey;
-
-    @Value("${openai.api.url}")
-    private String apiUrl;
 
     @Autowired
     private ChatMessageRepo chatMessageRepo;
@@ -29,23 +26,30 @@ public class ChatService {
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     public ChatMessage getChatResponse(String userMessage) throws IOException {
-        // Membuat JSON payload
-        String json = "{\n" +
-                "  \"model\": \"text-davinci-003\",\n" +
-                "  \"prompt\": \"" + userMessage + "\",\n" +
-                "  \"max_tokens\": 100\n" +
-                "}";
+        // Membuat JSON payload menggunakan ObjectMapper untuk keamanan
+        ObjectNode requestBody = objectMapper.createObjectNode();
+        requestBody.put("model", "gpt-4-0314");
 
-        // Membuat permintaan HTTP
-        RequestBody body = RequestBody.create(
-                json,
-                MediaType.parse("application/json")
-        );
+        ArrayNode messages = objectMapper.createArrayNode();
+        ObjectNode message = objectMapper.createObjectNode();
+        message.put("role", "user");
+        message.put("content", userMessage);
+        messages.add(message);
 
-        Request request = new Request().Builder()
-                .url(apiUrl)
+        requestBody.set("messages", messages);
+        requestBody.put("max_tokens", 100);
+
+        String json = requestBody.toString(); // Ini memastikan JSON valid
+
+        // Membuat request body
+        RequestBody body = RequestBody.create(json, MediaType.parse("application/json"));
+
+        // Membuat request
+        Request request = new Request.Builder()
+                .url("https://api.openai.com/v1/chat/completions")
                 .post(body)
                 .addHeader("Authorization", "Bearer " + apiKey)
+                .addHeader("Content-Type", "application/json")
                 .build();
 
         // Mengirim permintaan dan menangani respons
@@ -54,7 +58,7 @@ public class ChatService {
         if (response.isSuccessful()) {
             String responseBody = response.body().string();
             JsonNode rootNode = objectMapper.readTree(responseBody);
-            String botResponse = rootNode.get("choices").get(0).get("text").asText().trim();
+            String botResponse = rootNode.get("choices").get(0).get("message").get("content").asText().trim();
 
             // Simpan chat ke database
             ChatMessage chatMessage = new ChatMessage();
@@ -64,7 +68,9 @@ public class ChatService {
 
             return chatMessage;
         } else {
-            throw new IOException("Error in OpenAI API call: " + response.body().string());
+            String errorResponse = response.body().string();
+            throw new IOException("Error in OpenAI API call: " + errorResponse);
         }
     }
+
 }
