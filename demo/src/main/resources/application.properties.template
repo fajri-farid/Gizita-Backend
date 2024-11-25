@@ -1,8 +1,8 @@
 spring.application.name=demo
 
-spring.datasource.url=jdbc:mysql://localhost:4306/gizita
-spring.datasource.username=root
-spring.datasource.password=root
+spring.datasource.url=
+spring.datasource.username=
+spring.datasource.password=
 
 spring.jpa.show-sql=true
 spring.jpa.generate-ddl=true
