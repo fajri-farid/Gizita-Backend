@@ -18,6 +18,7 @@ public class AuserController {
     @Autowired
     private UserLoginService userLoginService;
 
+//    @CrossOrigin(origins = "http://localhost:8010")
     @PostMapping("/regist")
     public ResponseEntity<ResponseDTO<?>> registerUser(@RequestBody RegisterUserDTO registerUserDTO) {
         try {
