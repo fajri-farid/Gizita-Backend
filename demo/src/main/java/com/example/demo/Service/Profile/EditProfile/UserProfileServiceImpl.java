@@ -30,6 +30,22 @@ public class UserProfileServiceImpl implements EditUserProfileService{
         if (updatedProfile.getGender() != null) {
             existingUser.setGender(updatedProfile.getGender());
         }
+        if (updatedProfile.getFullName() != null) {
+            existingUser.setFullName(updatedProfile.getFullName());
+        }
+        if (updatedProfile.getBio() != null) {
+            existingUser.setBio(updatedProfile.getBio());
+        }
+
+        return auserRepository.save(existingUser);
+    }
+
+    @Override
+    public GeneralUser changePassword(int id, String newPassword) {
+        GeneralUser existingUser = (GeneralUser) auserRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("User not found with ID: " + id));
+
+        existingUser.setPassword(newPassword);
 
         return auserRepository.save(existingUser);
     }

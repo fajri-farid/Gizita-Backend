@@ -11,7 +11,6 @@ public class DemoApplication {
 	@Value("${openai.key}")
 	private String openaiAPIKey;
 
-
 	public static void main(String[] args) {
 		SpringApplication.run(DemoApplication.class, args);
 	}

@@ -44,7 +44,9 @@ public abstract class Auser {
 
     protected Double balance = 0.0;
     protected String address;
+    protected String fullName;
     protected String phoneNumber;
+    protected String bio;
 
     @Enumerated(EnumType.STRING)
     private Gender gender;
