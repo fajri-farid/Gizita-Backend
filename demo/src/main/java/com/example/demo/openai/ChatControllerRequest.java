@@ -1,6 +1,10 @@
 package com.example.demo.openai;
 
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.DeserializationFeature;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -51,8 +55,29 @@ public class ChatControllerRequest {
     }
 
 
+    private String generateNutritionalPrompt() {
+        return "Hasilkan HANYA JSON tanpa komentar atau teks tambahan. Pastikan jawabannya sesuai makanan orang indonesia dan sesuai untuk menengah atau kebawah. Pastikan makanan yang mudah diakses dan dimasak dan juga berikan alasan sedikit lebih panjang agar lebih jelas. Fokus pada makanan bergizi untuk mencegah stunting:\n" +
+                "{\n" +
+                "  \"sarapan\": {\n" +
+                "    \"menu\": \"Bubur ayam dengan telur rebus\",\n" +
+                "    \"alasan\": \"Tinggi protein, mudah dicerna, mendukung pertumbuhan\"\n" +
+                "  },\n" +
+                "  \"makanSiang\": {\n" +
+                "    \"menu\": \"Nasi merah, ikan goreng, sayur bayam\",\n" +
+                "    \"alasan\": \"Kombinasi protein, karbohidrat kompleks, dan zat besi\"\n" +
+                "  },\n" +
+                "  \"makanMalam\": {\n" +
+                "    \"menu\": \"Sop ayam dengan wortel dan kentang\",\n" +
+                "    \"alasan\": \"Protein, vitamin A, karbohidrat untuk pertumbuhan\"\n" +
+                "  },\n" +
+                "  \"totalGizi\": \"Seimbang dengan protein, karbohidrat kompleks, dan mikronutrien\",\n" +
+                "  \"biayaPerHari\": \"Rp 30.000 - Rp 40.000\"\n" +
+                "}\n\n" +
+                "Pastikan JSON valid, fokus pada nutrisi anti-stunting, bahan murah dan bergizi.";
+    }
+
     @PostMapping("/chatbot/saran-makanan")
-    public String getNutritionalSuggestion() {
+    public ResponseEntity<Map<String, Object>> getNutritionalSuggestion() {
         String prompt = generateNutritionalPrompt();
 
         ChatCompletionRequest chatCompletionRequest = new ChatCompletionRequest("gpt-4o", prompt);
@@ -64,29 +89,41 @@ public class ChatControllerRequest {
         );
 
         if (response != null && !response.getChoices().isEmpty()) {
-            return response.getChoices().get(0).getMessage().getContent();
+            String rawOutput = response.getChoices().get(0).getMessage().getContent();
+
+            // Tambahkan pembersihan output
+            String cleanedOutput = rawOutput
+                    .replaceAll("^```json?\\s*", "") // Hapus backticks json di awal
+                    .replaceAll("```$", "")         // Hapus backticks di akhir
+                    .trim();                        // Hapus whitespace tambahan
+
+            try {
+                ObjectMapper objectMapper = new ObjectMapper();
+                objectMapper.configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
+
+                Map<String, Object> nutritionalSuggestion = objectMapper.readValue(cleanedOutput, new TypeReference<Map<String, Object>>(){});
+
+                return ResponseEntity.ok(nutritionalSuggestion);
+            } catch (Exception e) {
+                // Log error untuk debugging
+                System.err.println("Cleaned Output: " + cleanedOutput);
+                e.printStackTrace();
+
+                Map<String, Object> errorResponse = new HashMap<>();
+                errorResponse.put("error", "Gagal memproses saran makanan");
+                errorResponse.put("errorDetails", e.getMessage());
+                errorResponse.put("rawOutput", rawOutput);
+                return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(errorResponse);
+            }
         }
 
-        return "No response from OpenAI API";
-    }
-
-    private String generateNutritionalPrompt() {
-        return "Buatkan rekomendasi makanan bergizi untuk sarapan, makan siang, dan makan malam yang relevan untuk mencegah stunting. Untuk makanannya sesuaikan preferensi makanan untuk orang menengah atau kebawah karena mereka adalah target kami ini. Setiap rekomendasi harus berisi saran makanan dan alasan mengapa makanan tersebut penting dan pastikan output yang kamu berikan relevan. Format respons dalam bentuk JSON, di mana elemen HTML berada dalam properti \"output\". Contoh:\n" +
-                "\n" +
-                "{\n" +
-                "  \"output\": \"<div>\n" +
-                "    <h3>Rekomendasi Makanan Bergizi</h3>\n" +
-                "    <ul>\n" +
-                "        <li><strong>Sarapan:</strong> Bubur ayam dengan telur rebus dan segelas susu. <br> Alasan: Bubur ayam mudah dicerna dan kaya protein untuk membantu pertumbuhan, sementara telur dan susu menyediakan protein serta kalsium untuk memperkuat tulang.</li>\n" +
-                "        <li><strong>Makan Siang:</strong> Ikan goreng, nasi merah, sayur asem, dan buah pepaya. <br> Alasan: Ikan goreng mengandung omega-3 untuk perkembangan otak, nasi merah kaya serat, sayur asem sumber vitamin, dan pepaya kaya vitamin C untuk meningkatkan daya tahan tubuh.</li>\n" +
-                "        <li><strong>Makan Malam:</strong> Sup ayam, kentang rebus, dan jus alpukat. <br> Alasan: Sup ayam memberikan protein dan cairan yang membantu regenerasi sel, kentang sebagai sumber energi, dan jus alpukat kaya lemak sehat untuk mendukung pertumbuhan otak.</li>\n" +
-                "    </ul>\n" +
-                "  </div>\"\n" +
-                "}";
+        Map<String, Object> errorResponse = new HashMap<>();
+        errorResponse.put("error", "Tidak dapat menghasilkan saran makanan");
+        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(errorResponse);
     }
 
     @PostMapping("/chatbot/olah-bahan")
-    public String getCookingSuggestion(@RequestBody Map<String, String> request) {
+    public ResponseEntity<Map<String, Object>> getCookingSuggestion(@RequestBody Map<String, String> request) {
         String ingredients = request.get("ingredients");
 
         String prompt = generateCookingPrompt(ingredients);
@@ -99,39 +136,62 @@ public class ChatControllerRequest {
                 ChatControllerResponse.class
         );
 
-        // Memeriksa apakah respons tersedia dan mengembalikan hasil
+        // Memeriksa apakah respons tersedia dan memprosesnya
         if (response != null && !response.getChoices().isEmpty()) {
-            return response.getChoices().get(0).getMessage().getContent();
+            String rawOutput = response.getChoices().get(0).getMessage().getContent();
+
+            // Pembersihan output jika diperlukan
+            String cleanedOutput = rawOutput
+                    .replaceAll("^```json?\\s*", "") // Menghapus backticks jika ada
+                    .replaceAll("```$", "")         // Menghapus backticks di akhir
+                    .trim();
+
+            try {
+                ObjectMapper objectMapper = new ObjectMapper();
+                Map<String, Object> jsonResponse = objectMapper.readValue(cleanedOutput, new TypeReference<Map<String, Object>>() {});
+
+                return ResponseEntity.ok(jsonResponse);
+            } catch (Exception e) {
+                // Logging dan handling error
+                Map<String, Object> errorResponse = new HashMap<>();
+                errorResponse.put("error", "Gagal memproses saran masakan");
+                errorResponse.put("details", e.getMessage());
+                errorResponse.put("rawOutput", rawOutput);
+                return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(errorResponse);
+            }
         }
 
-        return "No response from OpenAI API";
+        Map<String, Object> errorResponse = new HashMap<>();
+        errorResponse.put("error", "Tidak ada respons dari API OpenAI");
+        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(errorResponse);
     }
 
     private String generateCookingPrompt(String ingredients) {
         String[] ingredientArray = ingredients.split(", ");
-        StringBuilder promptBuilder = new StringBuilder("Saya memiliki bahan makanan berikut: ");
-        for (String ingredient : ingredientArray) {
-            promptBuilder.append(ingredient).append(", ");
-        }
-        promptBuilder.setLength(promptBuilder.length() - 2);
+        StringBuilder promptBuilder = new StringBuilder();
 
-        promptBuilder.append(". Buatkan saya saran masakan yang bisa diolah dari bahan-bahan tersebut, sertakan langkah-langkah memasak yang lebih detail, dan pastikan hasilnya relevan dengan bahan yang diberikan dan merupakan makanan yang sehat (pastikan step-stepnya itu menghasilkan makanan yang sehat!) dan juga terpenting output resepnya itu makanan untuk kalangan menengah atau kebawah jadi mereka bisa dengan mudah buat resepnya dengan bahan dan kondisi keuangan seadanya. Format respons dalam bentuk JSON, di mana elemen HTML berada dalam properti \"output\". Setiap langkah disusun dalam bentuk list yang mudah dipahami. Contoh format respons:\n" +
-                "{\n" +
-                "  \"output\": \"<h2>Resep Olahan dari Bahan yang Tersedia</h2>\n" +
-                "    <h3><strong>Resep:</strong> Tumis Kangkung dengan Tahu.</h3>\n" +
-                "  <ol>\n" +
-                "    <li>Potong tahu menjadi dadu kecil. Pisahkan daun kangkung dari batangnya, kemudian cuci bersih kedua bahan tersebut.</li>\n" +
-                "    <li>Iris tipis bawang putih.</li>\n" +
-                "    <li>Panaskan sedikit minyak zaitun dalam wajan di atas api sedang. Minyak zaitun dipilih karena lebih sehat.</li>\n" +
-                "    <li>Masukkan bawang putih yang sudah diiris tipis dan tumis sebentar hingga harum, jangan sampai gosong.</li>\n" +
-                "    <li>Tambahkan tahu dadu ke dalam wajan dan tumis hingga tahu berwarna keemasan dan mulai renyah.</li>\n" +
-                "    <li>Masukkan kangkung ke dalam wajan, aduk rata bersama tahu dan bawang putih. Tumis hingga kangkung layu.</li>\n" +
-                "    <li>Tambahkan sedikit garam dan merica secukupnya. Jika diinginkan, tambahkan sedikit kaldu jamur untuk meningkatkan rasanya.</li>\n" +
-                "    <li>Aduk rata semua bahan, kemudian angkat dari api. Pastikan untuk tidak overcooked agar nutrisi dari kangkung tetap terjaga.</li>\n" +
-                "    <li>Sajikan panas sebagai pendamping nasi merah atau nasi putih untuk makanan yang lebih sehat.</li>\n" +
-                "  </ol>\n" +
-                "  <p><strong>Alasan:</strong> Tumis kangkung dengan tahu adalah pilihan makanan yang sehat. Kangkung kaya akan vitamin A, vitamin C, dan zat besi, sementara tahu menyediakan sumber protein nabati yang penting. Penggunaan minyak zaitun juga menambah asupan lemak sehat.</p>\"\n" +
-                "}");
+        promptBuilder.append("{\n");
+        promptBuilder.append("  \"instruction\": \"Buatkan saya saran masakan dari bahan berikut:\",\n");
+        promptBuilder.append("  \"ingredients\": [\n");
+        for (int i = 0; i < ingredientArray.length; i++) {
+            promptBuilder.append("    \"").append(ingredientArray[i]).append("\"");
+            if (i < ingredientArray.length - 1) {
+                promptBuilder.append(",");
+            }
+            promptBuilder.append("\n");
+        }
+        promptBuilder.append("  ],\n");
+        promptBuilder.append("  \"requirements\": {\n");
+        promptBuilder.append("    \"format\": \"JSON\",\n");
+        promptBuilder.append("    \"focus\": \"Makanan sehat, mudah dibuat, dan cocok untuk kalangan menengah ke bawah\",\n");
+        promptBuilder.append("    \"output\": {\n");
+        promptBuilder.append("      \"menu\": \"Nama masakan\",\n");
+        promptBuilder.append("      \"steps\": \"Daftar langkah-langkah memasak\",\n");
+        promptBuilder.append("      \"reason\": \"Penjelasan singkat mengapa masakan ini sehat dan relevan\"\n");
+        promptBuilder.append("    }\n");
+        promptBuilder.append("  }\n");
+        promptBuilder.append("}");
+
         return promptBuilder.toString();
     }
 }
