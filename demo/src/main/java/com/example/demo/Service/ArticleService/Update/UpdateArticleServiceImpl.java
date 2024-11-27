@@ -16,9 +16,16 @@ public class UpdateArticleServiceImpl implements  UpdateArticleService{
     public Article updateArticleById(int id, Article updatedArticle) {
         Article existingArticle = articleRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Article not found with ID: " + id));
-        existingArticle.setTitle(updatedArticle.getTitle());
-        existingArticle.setTumbnailImgUrl(updatedArticle.getTumbnailImgUrl());
-        existingArticle.setContent(updatedArticle.getContent());
+
+        existingArticle.setCategory(updatedArticle.getCategory());
+        existingArticle.setIcon(updatedArticle.getIcon());
+        existingArticle.setAuthor(updatedArticle.getAuthor());
+        existingArticle.setDescription(updatedArticle.getDescription());
+        existingArticle.setMonth(updatedArticle.getMonth());
+        existingArticle.setViews(updatedArticle.getViews());
+        existingArticle.setLikes(updatedArticle.getLikes());
+        existingArticle.setImage(updatedArticle.getImage());
+        existingArticle.setLink_artikel(updatedArticle.getLink_artikel());
 
         existingArticle.setUpdatedAt(LocalDateTime.now());
         return articleRepository.save(existingArticle);
